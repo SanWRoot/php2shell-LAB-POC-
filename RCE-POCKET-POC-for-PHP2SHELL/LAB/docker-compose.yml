@@ -1,0 +1,13 @@
+services:
+  php2shell-lab:
+    build: .
+    image: php2shell-lab:latest
+    container_name: php2shell-lab
+    # Réseau bridge explicite : les ports publiés écoutent sur TOUTES les
+    # interfaces de l'hôte (localhost + LAN/WiFi). Le lab devient joignable
+    # depuis toute machine du réseau sur http://IP_HOTE:8486 et :8483 (TLS).
+    network_mode: bridge
+    ports:
+      - "8486:80"    # C: /remote_app.php  +  E: /enum.php  + /check.php
+      - "8483:443"   # mêmes portes en TLS (cert auto-signé, --insecure côté driver)
+    restart: unless-stopped

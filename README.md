@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![CVE](https://img.shields.io/badge/CVE--2026--109618-Critical-red?style=for-the-badge)](https://nvd.nist.gov/vuln/detail/cve-2026-109618)
 [![CVE](https://img.shields.io/badge/CVE--2026--109619-Critical-red?style=for-the-badge)](https://nvd.nist.gov/vuln/detail/cve-2026-109619)
-[![CVSS v4.0](https://img.shields.io/badge/CVSS%20v4.0-9.2%20critical-critical?style=for-the-badge)]()
+[![CVSS v4.0](https://img.shields.io/badge/CVSS%20v4.0-9.2-critical?style=for-the-badge)]()
 
 
 

@@ -24,6 +24,9 @@ Proof-of-concept exploit and isolated lab environment for two critical heap use-
 
 ---
 
+
+
+
 ## Background
 
 On October 20, 2026, details of two critical PHP vulnerabilities leaked ahead of the coordinated disclosure window. The PHP security team released emergency patches the following day at 14:00 UTC. Researchers at watchTowr independently confirmed both vulnerabilities.
@@ -33,6 +36,51 @@ The bugs reside in PHP's session upload progress tracking mechanism and the unde
 A proof-of-concept tool named "PHP2Shell" was attributed to Calif.IO and leaked alongside the advisory. Sansec predicted mass exploitation within 15 minutes of the patch release.
 
 ---
+## CVE-2026-109618 — OOM State Corruption
+
+```
+Attacker sends a crafted multipart POST
+    ↓
+PHP hits memory exhaustion (OOM) while parsing the request body
+    ↓
+OOM escapes via longjmp() — but request data is only half-initialized
+    ↓
+Request shutdown runs anyway, treating half-initialized data as valid
+    ↓
+    → Remote code execution (as the web-server user)
+```
+
+**Attack surface:** 
+any PHP page that accepts POST (application code never runs).
+Three amplification paths can exhaust `memory_limit=128M` within the default
+`post_max_size=8M` — we achieved **44x amplification** with a 500K-header flood
+(3 MB on the wire → 128 MB inside PHP).
+
+## CVE-2026-109619 — Cross-Request Stale State
+
+```
+Request N:   an operation stores a pointer to request-private memory in global state
+    ↓
+Request N:   a fatal error (OOM) skips the paired state reset
+    ↓
+Request N ends: the request heap is freed, but the global pointer still
+               references the freed memory (dangling)
+    ↓
+Request N+1 (same worker): something reads the stale value before normal init
+    ↓
+    → Use-After-Free → remote code execution
+```
+
+**Attack surface:** the _**`session.upload_progress`**_ callback runs **before** module
+initialization, making it a natural consumer. The producer can be an OOM, a fatal
+error, or any exceptional path that skips cleanup.
+
+**How the CVEs fits together:** 109618 is the mechanism that *produces* invalid
+state; 109619 is the mechanism that *consumes* it across requests. A real attack
+chain typically uses both.
+
+---
+
 
 ## Exploit Usage
 
